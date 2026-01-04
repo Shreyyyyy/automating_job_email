@@ -520,6 +520,7 @@ def main():
     
     st.markdown("### 📝 Step 1: Paste Text with Emails")
     st.markdown("Paste any text containing email addresses (WhatsApp messages, lists, paragraphs, etc.)")
+    st.markdown("💡 **Tip:** If you want to parse text from Instagram, [go here](https://snaplytics.io/instagram-caption-copy/)")
     
     input_text = st.text_area(
         label="Input Text",
@@ -760,15 +761,7 @@ def main():
                 else:
                     st.error(f"✗ {result.email} - {result.error}")
     
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #666; font-size: 0.85rem; padding: 2rem 0;">
-        <p>💡 <strong>Tip:</strong> For best results on mobile, use landscape orientation</p>
-        <p>🔒 Your credentials are secure and never exposed to the frontend</p>
-        <p style="margin-top: 1rem; opacity: 0.7;">Built with ❤️ using Streamlit</p>
-    </div>
-    """, unsafe_allow_html=True)
+
 
 
 # ============================================================================
