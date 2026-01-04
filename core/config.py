@@ -85,13 +85,24 @@ class Config:
         if not cls.SENDER_PASSWORD:
             return False, "SENDER_PASSWORD not configured in .env file"
         
-        if not os.path.exists(cls.CV_PATH):
-            return False, f"CV file not found at {cls.CV_PATH}"
+        # CV is optional - users can upload their own
+        # if not os.path.exists(cls.CV_PATH):
+        #     return False, f"CV file not found at {cls.CV_PATH}"
         
         if not os.path.exists(cls.COVER_LETTER_PATH):
             return False, f"Cover letter template not found at {cls.COVER_LETTER_PATH}"
         
         return True, None
+    
+    @classmethod
+    def has_default_cv(cls) -> bool:
+        """
+        Check if the default CV file exists.
+        
+        Returns:
+            bool: True if cv.pdf exists, False otherwise
+        """
+        return os.path.exists(cls.CV_PATH)
     
     @classmethod
     def get_masked_email(cls) -> str:

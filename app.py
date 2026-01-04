@@ -438,7 +438,7 @@ def main():
         **Setup Instructions:**
         1. Create a `.env` file (copy from `.env.example`)
         2. Add your email credentials
-        3. Place your CV as `cv.pdf` in the project root
+        3. (Optional) Place your CV as `cv.pdf` in the project root, or upload it through the UI
         4. Restart the application
         """)
         return
@@ -446,7 +446,10 @@ def main():
     # Show configuration status
     with st.expander("📋 Configuration Status", expanded=False):
         st.success(f"✓ Sender: {config.get_masked_email()}")
-        st.success(f"✓ CV: {Path(config.CV_PATH).name}")
+        if config.has_default_cv():
+            st.success(f"✓ Default CV: {Path(config.CV_PATH).name}")
+        else:
+            st.warning("⚠️ No default CV - please upload one below")
         st.success(f"✓ SMTP: {config.SMTP_HOST}:{config.SMTP_PORT}")
         st.info(f"Rate Limit: {config.MIN_DELAY}-{config.MAX_DELAY}s between emails")
     
@@ -455,7 +458,14 @@ def main():
     # ========================================================================
     
     st.markdown("### 📄 Upload Your CV")
-    st.markdown("Upload a PDF file to use as your CV attachment (optional - will use default if not uploaded)")
+    
+    # Check if we have a default CV
+    has_default_cv = config.has_default_cv()
+    
+    if has_default_cv:
+        st.markdown("Upload a PDF file to use as your CV attachment (optional - will use default if not uploaded)")
+    else:
+        st.markdown("⚠️ **Upload a PDF file to use as your CV attachment (required - no default CV found)**")
     
     uploaded_file = st.file_uploader(
         "Choose a PDF file",
@@ -464,8 +474,12 @@ def main():
         label_visibility="collapsed"
     )
     
+    # Track if we have ANY CV available (uploaded or default)
+    has_any_cv = False
+    
     if uploaded_file is not None:
         st.session_state.uploaded_cv = uploaded_file
+        has_any_cv = True
         file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
         st.markdown(f"""
         <div class="success-box">
@@ -473,20 +487,31 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     elif st.session_state.uploaded_cv is not None:
+        has_any_cv = True
         file_size_mb = len(st.session_state.uploaded_cv.getvalue()) / (1024 * 1024)
         st.markdown(f"""
         <div class="info-box" style="background: linear-gradient(135deg, #2a2a2a 0%, #404040 100%); color: white;">
             📎 Using: <strong>{st.session_state.uploaded_cv.name}</strong> ({file_size_mb:.2f} MB)
         </div>
         """, unsafe_allow_html=True)
-    else:
+    elif has_default_cv:
+        has_any_cv = True
         st.markdown(f"""
         <div class="info-box">
             📎 Using default CV: <strong>{Path(config.CV_PATH).name}</strong>
         </div>
         """, unsafe_allow_html=True)
+    else:
+        # No CV available at all
+        has_any_cv = False
+        st.markdown(f"""
+        <div class="error-box">
+            ⚠️ No CV available - please upload a PDF file above to continue
+        </div>
+        """, unsafe_allow_html=True)
     
     st.markdown("---")
+
 
     
     # ========================================================================
@@ -612,12 +637,20 @@ def main():
         
         st.markdown("")  # Spacing
         
+        # Check if CV is available before allowing send
+        if not has_any_cv:
+            st.markdown("""
+            <div class="error-box">
+                ⚠️ Cannot send emails without a CV. Please upload a PDF file in the section above.
+            </div>
+            """, unsafe_allow_html=True)
+        
         # Send button
         send_button = st.button(
             f"📤 Send to {len(st.session_state.parsed_emails)} Recipient(s)",
             type="secondary",
             use_container_width=True,
-            disabled=st.session_state.is_sending
+            disabled=st.session_state.is_sending or not has_any_cv  # Disable if no CV
         )
         
         if send_button:
