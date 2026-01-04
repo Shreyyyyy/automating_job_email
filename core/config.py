@@ -3,38 +3,65 @@ Configuration management for the bulk email application.
 
 Loads and validates environment variables for email sending.
 Designed to be secure and production-ready.
+Supports both local .env files and Streamlit Cloud secrets.
 """
 
 import os
 from typing import Optional
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file (for local development)
 load_dotenv()
+
+# Try to import streamlit for cloud deployment
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
+
+def get_config_value(key: str, default: str = "") -> str:
+    """
+    Get configuration value from Streamlit secrets or environment variables.
+    
+    Priority:
+    1. Streamlit secrets (for cloud deployment)
+    2. Environment variables (for local development)
+    3. Default value
+    """
+    if HAS_STREAMLIT:
+        try:
+            return st.secrets.get(key, os.getenv(key, default))
+        except (AttributeError, FileNotFoundError):
+            # Streamlit secrets not available, fall back to env vars
+            return os.getenv(key, default)
+    return os.getenv(key, default)
 
 
 class Config:
     """
     Centralized configuration class.
     
-    All sensitive data (credentials) are loaded from environment variables.
-    This ensures no credentials are hardcoded or exposed to the frontend.
+    All sensitive data (credentials) are loaded from environment variables
+    or Streamlit secrets. This ensures no credentials are hardcoded or 
+    exposed to the frontend.
     """
     
     # SMTP Configuration
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
-    SENDER_EMAIL: str = os.getenv("SENDER_EMAIL", "")
-    SENDER_PASSWORD: str = os.getenv("SENDER_PASSWORD", "")
-    SENDER_NAME: str = os.getenv("SENDER_NAME", "Job Applicant")
+    SMTP_HOST: str = get_config_value("SMTP_HOST", "smtp.gmail.com")
+    SMTP_PORT: int = int(get_config_value("SMTP_PORT", "587"))
+    SENDER_EMAIL: str = get_config_value("SENDER_EMAIL", "")
+    SENDER_PASSWORD: str = get_config_value("SENDER_PASSWORD", "")
+    SENDER_NAME: str = get_config_value("SENDER_NAME", "Job Applicant")
     
     # Email Content
-    JOB_TITLE: str = os.getenv("JOB_TITLE", "Software Engineer")
-    COMPANY_PREFERENCE: str = os.getenv("COMPANY_PREFERENCE", "your organization")
+    JOB_TITLE: str = get_config_value("JOB_TITLE", "Software Engineer")
+    COMPANY_PREFERENCE: str = get_config_value("COMPANY_PREFERENCE", "your organization")
     
     # Rate Limiting (in seconds)
-    MIN_DELAY: int = int(os.getenv("MIN_DELAY", "10"))
-    MAX_DELAY: int = int(os.getenv("MAX_DELAY", "15"))
+    MIN_DELAY: int = int(get_config_value("MIN_DELAY", "10"))
+    MAX_DELAY: int = int(get_config_value("MAX_DELAY", "15"))
     
     # File Paths
     CV_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "cv.pdf")
