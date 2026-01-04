@@ -582,6 +582,36 @@ def main():
             else:
                 st.markdown(f"**Attachment:** {Path(config.CV_PATH).name} (default)")
         
+        
+        
+        # Speed mode selector
+        st.markdown("**⚡ Sending Speed**")
+        speed_mode = st.radio(
+            "Choose sending mode:",
+            options=[
+                "⚡ Instant Mode (Parallel sending - ULTRA FAST!)",
+                "🚀 Fast Mode (Sequential, no delays)",
+                "🛡️ Safe Mode (Rate limited - recommended)"
+            ],
+            index=2,  # Default to safe mode
+            help="Instant mode sends all emails in parallel (fastest). Fast mode sends sequentially without delays. Safe mode adds delays to prevent spam detection.",
+            label_visibility="collapsed"
+        )
+        
+        # Show estimated time based on mode
+        num_emails = len(st.session_state.parsed_emails)
+        if "Instant Mode" in speed_mode:
+            est_time = f"~{max(5, num_emails // 2)} seconds"
+            st.markdown(f"<div style='color: #10b981; font-size: 0.9rem; margin-top: -0.5rem;'>⚡ Estimated time: {est_time} (parallel sending)</div>", unsafe_allow_html=True)
+        elif "Fast Mode" in speed_mode:
+            est_time = f"~{num_emails * 1.5:.0f} seconds"
+            st.markdown(f"<div style='color: #3b82f6; font-size: 0.9rem; margin-top: -0.5rem;'>🚀 Estimated time: {est_time} (sequential)</div>", unsafe_allow_html=True)
+        else:
+            est_time = f"~{num_emails * 3.5:.0f} seconds"
+            st.markdown(f"<div style='color: #f59e0b; font-size: 0.9rem; margin-top: -0.5rem;'>🛡️ Estimated time: {est_time} (rate limited)</div>", unsafe_allow_html=True)
+        
+        st.markdown("")  # Spacing
+        
         # Send button
         send_button = st.button(
             f"📤 Send to {len(st.session_state.parsed_emails)} Recipient(s)",
@@ -615,7 +645,9 @@ def main():
                 # Store result
                 st.session_state.send_results.append(result)
             
+            
             # Send emails
+            start_time = time.time()  # Track sending time
             try:
                 # Get uploaded CV data if available
                 uploaded_cv_bytes = None
@@ -624,19 +656,51 @@ def main():
                     uploaded_cv_bytes = st.session_state.uploaded_cv.getvalue()
                     uploaded_cv_name = st.session_state.uploaded_cv.name
                 
-                results = sender.send_bulk_emails(
-                    recipient_emails=st.session_state.parsed_emails,
-                    progress_callback=update_progress,
-                    uploaded_cv_bytes=uploaded_cv_bytes,
-                    uploaded_cv_name=uploaded_cv_name
-                )
+                # Determine sending method based on speed mode
+                is_instant_mode = "Instant Mode" in speed_mode
+                is_fast_mode = "Fast Mode" in speed_mode
+                
+                if is_instant_mode:
+                    # INSTANT MODE: Parallel/concurrent sending
+                    status_text.markdown("**⚡ Sending all emails in parallel...**")
+                    results = sender.send_bulk_emails_concurrent(
+                        recipient_emails=st.session_state.parsed_emails,
+                        progress_callback=update_progress,
+                        max_workers=10,  # Send up to 10 emails simultaneously
+                        uploaded_cv_bytes=uploaded_cv_bytes,
+                        uploaded_cv_name=uploaded_cv_name
+                    )
+                else:
+                    # FAST/SAFE MODE: Sequential sending
+                    min_delay = 0 if is_fast_mode else config.MIN_DELAY
+                    max_delay = 0 if is_fast_mode else config.MAX_DELAY
+                    
+                    results = sender.send_bulk_emails(
+                        recipient_emails=st.session_state.parsed_emails,
+                        progress_callback=update_progress,
+                        min_delay=min_delay,
+                        max_delay=max_delay,
+                        uploaded_cv_bytes=uploaded_cv_bytes,
+                        uploaded_cv_name=uploaded_cv_name
+                    )
+
                 
                 # Complete
                 progress_bar.progress(1.0)
                 status_text.empty()
                 
-                st.markdown('<div class="success-box">✓ Bulk send completed!</div>', 
-                           unsafe_allow_html=True)
+                # Calculate and display sending time
+                elapsed_time = time.time() - start_time
+                
+                st.markdown(f"""
+                <div class="success-box">
+                    ✓ Bulk send completed in <strong>{elapsed_time:.1f} seconds</strong>!
+                    <br>
+                    <span style="font-size: 0.9rem; opacity: 0.8;">
+                        Average: {elapsed_time / len(st.session_state.parsed_emails):.1f}s per email
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
                 
             except Exception as e:
                 st.markdown(f'<div class="error-box">✗ Error: {str(e)}</div>', 
